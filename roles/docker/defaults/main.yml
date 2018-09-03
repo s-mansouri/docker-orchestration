@@ -1,0 +1,13 @@
+---
+docker_version: '18.03'
+
+docker_compose_version: "1.21.2"
+
+# add users to docker groups
+docker_users: []
+
+docker_install_docker_compose: True
+
+retry_stagger: 5
+
+docker_deb_version: docker-ce_18.03.1~ce-0~debian_amd64.deb

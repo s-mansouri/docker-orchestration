@@ -1,0 +1,69 @@
+---
+- name: Ensure docker installed.
+  shell: dpkg-query -s docker-ce | grep 'install ok installed'
+  ignore_errors: True
+  register: check_docker
+  tags: ['docker', 'resolv']
+
+- name: Ensure dependencies are installed.
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - apt-transport-https
+    - ca-certificates
+    - software-properties-common
+  tags: ['docker']
+
+- name: Add Docker’s official GPG key
+  action: "{{ docker_repo_key_info.pkg_key }}"
+  args:
+    id: "{{item}}"
+    url: "{{docker_repo_key_info.url}}"
+    state: present
+  register: keyserver_task_result
+  until: keyserver_task_result is succeeded
+  retries: 4
+  delay: "{{ retry_stagger | random + 3 }}"
+  with_items: "{{ docker_repo_key_info.repo_keys }}"
+  tags: ['docker']
+
+- block:
+  - name: Download docker deb file
+    get_url:
+      url: https://download.docker.com/linux/debian/dists/stretch/pool/stable/amd64/{{ docker_deb_version }}
+      dest: /tmp/{{ docker_deb_version }}
+
+  - name: Install docker from .deb package
+    apt:
+      deb: /tmp/{{ docker_deb_version }}
+  when: check_docker.rc == 1
+  tags: ['docker']
+
+- name: ensure docker service is started and enabled
+  service:
+    name: "{{ item }}"
+    enabled: yes
+    state: started
+  with_items:
+    - docker
+  tags: ['docker']
+
+- name: Add specific users to "docker" group
+  user:
+    name: "{{ item }}"
+    groups: "docker"
+    append: True
+  with_items: "{{ docker_users }}"
+  when: docker_users
+  tags: ['docker']
+
+- name: Install Docker Compose
+  get_url:
+    url: "https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-Linux-x86_64"
+    dest: "/usr/local/bin/docker-compose"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+  when: docker_install_docker_compose
+  tags: ['docker']
